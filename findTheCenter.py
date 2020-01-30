@@ -1,4 +1,5 @@
 import pyglet
+import numpy as np
 from pyglet.sprite import Sprite
 from gameObjects import gameObjects, preload_image
 from random import randint
@@ -8,40 +9,43 @@ class findTheCenter(pyglet.window.Window):
 		super().__init__(*args, **kwargs)
 		self.set_location(400,100)
 		self.frame_rate = 1/60.0
-		self.velocity = 50
+
+		velocity = np.arange(10,500,20)
+		
+		self.velocityx = velocity[randint(0,24)]
+		self.velocityy = velocity[randint(0,24)]
+		
 		self.main_batch = pyglet.graphics.Batch()
+		backGround = pyglet.graphics.OrderedGroup(0)
+		foreGround = pyglet.graphics.OrderedGroup(1)
 
-		self.redArc_list = []
-		self.redArcSprite = preload_image('redArc.png')
-		for i in range(20):
-			self.redArc_list.append(gameObjects(randint(0,450),randint(0,450),Sprite(self.redArcSprite, batch=self.main_batch)))
-		
-		# redArc_sprite = Sprite(preload_image('redArc.png'), batch=self.main_batch)
-		# self.redArc = gameObjects(0,0,redArc_sprite)
-
-		backGround_sprite = Sprite(preload_image('backGround.png'), batch=self.main_batch)
+		backGround_sprite = Sprite(preload_image('backGround.png'), batch=self.main_batch, group=backGround)
 		self.backGround = gameObjects(0,0,backGround_sprite)
-		
-		blackArc_sprite = Sprite(preload_image('blackArc.png'), batch=self.main_batch)
+
+		blackArc_sprite = Sprite(preload_image('blackArc.png'), batch=self.main_batch, group=foreGround)
 		self.blackArc = gameObjects(216,216,blackArc_sprite)
+
+		redArc_sprite = Sprite(preload_image('redArc.png'), batch=self.main_batch, group=foreGround)
+		self.redArc = gameObjects(0,0,redArc_sprite)
 		
 
 	def on_draw(self):
 		self.clear()
 		self.main_batch.draw()
 
-	def moveUp(self, dt):
-		for redArc in self.redArc_list:
-			redArc.update()
-			if redArc.posy < 500 - redArc.width:
-				redArc.posy += self.velocity * dt
-				
-		# self.redArc.update()
-		# if self.redArc.posy < 500 - self.redArc.width:
-		# 	self.redArc.posy += self.velocity * dt
+	def move(self, dt):
+		self.redArc.update()
+		if self.redArc.posy < 500 - self.redArc.width and self.redArc.posx < 500 - self.redArc.width:
+			self.redArc.posx += self.velocityx * dt
+			self.redArc.posy += self.velocityy * dt
+
+		# collusion detection
+		if self.redArc.posy>220 and self.redArc.posy<250 and self.redArc.posx>220 and self.redArc.posx<250:
+			self.velocityx = 0
+			self.velocityy = 0
 
 	def update(self, dt):
-		self.moveUp(dt)
+		self.move(dt)
 
 
 width = 500
