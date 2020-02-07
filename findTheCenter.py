@@ -10,10 +10,11 @@ class findTheCenter(pyglet.window.Window):
 		self.set_location(400,100)
 		self.frame_rate = 1/60.0
 
-		velocity = np.arange(10,500,20)
+		self.velocity = 50
+		self.weight = np.arange(1,10,1)
 		
-		self.velocityx = velocity[randint(0,24)]
-		self.velocityy = velocity[randint(0,24)]
+		self.velocityx = self.weight[randint(0,9)] * self.velocity
+		self.velocityy = self.weight[randint(0,9)] * self.velocity
 		
 		self.main_batch = pyglet.graphics.Batch()
 		backGround = pyglet.graphics.OrderedGroup(0)
@@ -38,6 +39,9 @@ class findTheCenter(pyglet.window.Window):
 		if self.redArc.posy < 500 - self.redArc.width and self.redArc.posx < 500 - self.redArc.width:
 			self.redArc.posx += self.velocityx * dt
 			self.redArc.posy += self.velocityy * dt
+		else:
+			self.redArc.posx = 0
+			self.redArc.posy = 0
 
 		# collusion detection
 		if self.redArc.posy>220 and self.redArc.posy<250 and self.redArc.posx>220 and self.redArc.posx<250:
