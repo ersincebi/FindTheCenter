@@ -10,11 +10,13 @@ class findTheCenter(pyglet.window.Window):
 		self.set_location(400,100)
 		self.frame_rate = 1/60.0
 
-		self.velocity = 50
-		self.weight = np.arange(1,10,1)
-		
-		self.velocityx = self.weight[randint(0,9)] * self.velocity
-		self.velocityy = self.weight[randint(0,9)] * self.velocity
+		self.gen = 0
+
+		self.dataset = []
+
+		positive = np.arange(400,900,50)
+		negative = positive*-1
+		self.velocity = np.concatenate([positive, negative])
 		
 		self.main_batch = pyglet.graphics.Batch()
 		backGround = pyglet.graphics.OrderedGroup(0)
@@ -28,25 +30,50 @@ class findTheCenter(pyglet.window.Window):
 
 		redArc_sprite = Sprite(preload_image('redArc.png'), batch=self.main_batch, group=foreGround)
 		self.redArc = gameObjects(0,0,redArc_sprite)
-		
 
+		self.prediction()
+		self.setVelocity()
+		
+	def prediction(self):
+		self.predictionx = randint(0,19)
+		self.predictiony = randint(0,19)
+
+	def rePosition(self):
+		self.redArc.posx = randint(0,460)
+		self.redArc.posy = randint(0,460)
+
+	def setVelocity(self):
+		self.velocityx = self.velocity[self.predictionx]
+		self.velocityy = self.velocity[self.predictiony]
+
+	def addDataset(self, reward):
+		dictionary = {"posx":self.redArc.posx,"posy":self.redArc.posy,"x":self.predictionx, "y":self.predictiony, "r": reward}
+		self.dataset.append(dictionary.copy())
+
+	def restart(self, reward):
+		self.addDataset(reward)
+		self.rePosition()
+		self.prediction()
+		self.setVelocity()
+		self.gen += 1
+		
 	def on_draw(self):
 		self.clear()
 		self.main_batch.draw()
 
 	def move(self, dt):
 		self.redArc.update()
-		if self.redArc.posy < 500 - self.redArc.width and self.redArc.posx < 500 - self.redArc.width:
+		if self.redArc.posy < 500 - self.redArc.width and self.redArc.posx < 500 - self.redArc.width and self.redArc.posy > 0 and self.redArc.posx > 0:
 			self.redArc.posx += self.velocityx * dt
 			self.redArc.posy += self.velocityy * dt
 		else:
-			self.redArc.posx = 0
-			self.redArc.posy = 0
+			self.restart(0)
+
 
 		# collusion detection
-		if self.redArc.posy>220 and self.redArc.posy<250 and self.redArc.posx>220 and self.redArc.posx<250:
-			self.velocityx = 0
-			self.velocityy = 0
+		if self.redArc.posy>215 and self.redArc.posy<255 and self.redArc.posx>215 and self.redArc.posx<255:
+			print("generation: " + str(self.gen) + " has succeeded")
+			self.restart(1)
 
 	def update(self, dt):
 		self.move(dt)
