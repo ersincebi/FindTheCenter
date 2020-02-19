@@ -16,7 +16,7 @@ TITLE = "Find The Center"
 ########################################################
 QTABLESIZE = 10
 
-HM_EPISODES = 25000 # how many episodes
+HM_EPISODES = 3000 # how many episodes
 MOVE_PENALTY = 1
 MAX_MOVE = 200
 PENALTY = 300
@@ -29,13 +29,18 @@ EPS_DECAY = 0.9998
 LEARNING_RATE = 0.1
 DISCOUNT = 0.95
 
-VELOCITY = 50
+VELOCITY = 10
 ########################################################
 # q_table initialization
-q_table = {}
-for x in range(-SIZE+1, SIZE):
-	for y in range(-SIZE+1, SIZE):
-		q_table[(x,y)] = [np.random.uniform(-5,0) for _ in range(4)]
+start_q_table = None
+if start_q_table is None:
+	q_table = {}
+	for x in range(-SIZE+1, SIZE):
+		for y in range(-SIZE+1, SIZE):
+			q_table[(x,y)] = [np.random.uniform(-5,0) for _ in range(4)]
+else:
+	with open(start_q_table, 'rb') as f:
+		q_table = pickle.load(f)
 ########################################################
 
 class findTheCenter(pyglet.window.Window):
@@ -104,13 +109,13 @@ class findTheCenter(pyglet.window.Window):
 			self.redArc.posy = SIZE-40
 
 		# collusion detection
-		if self.redArc.posy < 500 - self.redArc.width and self.redArc.posx < 500 - self.redArc.width and self.redArc.posy > 0 and self.redArc.posx > 0:
-			self.reward = -MOVE_PENALTY
-		elif self.redArc.posy>200 and self.redArc.posy<265 and self.redArc.posx>200 and self.redArc.posx<265:
+		if self.redArc.posy == 500 or self.redArc.posx == 500 or self.redArc.posy == 0 and self.redArc.posx == 0:
+			self.reward = -PENALTY
+		if self.redArc.posy>200 and self.redArc.posy<265 and self.redArc.posx>200 and self.redArc.posx<265:
 			print(f'on #{self.episodes}, epsilon: {self.epsilon}')
 			self.reward = REWARD
 		else:
-			self.reward = -PENALTY
+			self.reward = -MOVE_PENALTY
 
 		self.episode_reward += self.reward
 
@@ -156,7 +161,7 @@ class findTheCenter(pyglet.window.Window):
 
 		elif self.episodes == HM_EPISODES:
 			# when all episodes are finished
-			moving_avg = np.convolve(episode_rewards, np.ones((SIZE,)) / SIZE, mode='valid')
+			moving_avg = np.convolve(self.episode_rewards, np.ones((SIZE,)) / SIZE, mode='valid')
 
 			plt.plot([i for i in range(len(moving_avg))], moving_avg)
 			plt.ylabel(f'reward {SIZE} moving avarage')
