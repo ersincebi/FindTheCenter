@@ -14,6 +14,12 @@ class gameObjects:
 			self.width = self.sprite.width
 			self.height = self.sprite.height
 
+	def __str__(self):
+		return f'{self.sprite.x},{self.sprite.y}'
+
+	def __sub__(self, other):
+		return (self.sprite.x - other.sprite.x, self.sprite.y - other.sprite.y)
+
 	def draw(self):
 		self.sprite.draw()
 
