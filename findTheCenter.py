@@ -5,7 +5,7 @@ import pickle
 import time
 from pyglet.sprite import Sprite
 from gameObjects import gameObjects, preload_image
-from random import randint
+from random import randrange
 from math import floor
 
 SIZE = 300
@@ -78,8 +78,8 @@ class findTheCenter(pyglet.window.Window):
 
 	def rePosition(self):
 		max_pos = SIZE - RED_ARC_DIAMETER
-		self.redArc.posx = randint(LOW, max_pos)
-		self.redArc.posy = randint(LOW, max_pos)
+		self.redArc.posx = randrange(LOW, max_pos, VELOCITY)
+		self.redArc.posy = randrange(LOW, max_pos, VELOCITY)
 	
 	def restart(self):
 		self.rePosition()
@@ -123,7 +123,7 @@ class findTheCenter(pyglet.window.Window):
 			self.reward = -PENALTY
 		if self.redArc.posy>coly and self.redArc.posy<colx and self.redArc.posx>coly and self.redArc.posx<colx:
 			# print(f'on #{self.episodes}, epsilon: {self.epsilon}, episode mean: {np.mean(self.episode_rewards[-SIZE:])}')
-			# print(f"succeed on episode #{self.episodes}")
+			print(f"succeed on episode #{self.episodes}, epsilon: {self.epsilon}")
 			self.reward = REWARD
 			
 			self.makeNewObservation()
