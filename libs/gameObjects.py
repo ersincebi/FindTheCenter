@@ -1,7 +1,7 @@
 import pyglet
 
 def preload_image(image):
-	return pyglet.image.load('shapes/' + image)
+	return pyglet.image.load('libs/shapes/' + image)
 
 class gameObjects:
 	def __init__(self, posx, posy, sprite=None):
