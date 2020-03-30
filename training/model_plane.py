@@ -4,8 +4,6 @@ from libs import game_rules as gr
 import tflearn
 from tflearn.layers.core import input_data, dropout, fully_connected
 from tflearn.layers.estimator import regression
-from keras.models import Sequential
-from keras.layers import Dense, InputLayer
 
 def model():
 	return train_model(td.training_data())
@@ -41,6 +39,6 @@ def train_model(training_data):
 
 	model = neural_network_model(input_size=len(X[0]))
 
-	model.fit({'input':X}, {'targets':Y}, n_epoch=5, snapshot_step=150, show_metric=True, run_id='findthecenter')
+	model.fit({'input':X}, {'targets':Y}, n_epoch=5, snapshot_step=40, show_metric=True, run_id='findthecenter', )
 
 	return model

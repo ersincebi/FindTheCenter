@@ -30,7 +30,7 @@ def training_data():
 				break
 
 
-		if score >= 10:
+		if score >= 50:
 			accepted_scores.append(score)
 			for data in game_memory:
 				output = [0,0,0,0]
