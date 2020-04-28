@@ -3,23 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import time
-import libs.game_rules as gr
+from libs.game_rules import TITLE, SIZE, LOW, HM_EPISODES, EPS_DECAY, BLACK_ARC_DIAMETER, RED_ARC_DIAMETER, EPSILON, MAX_MOVE, VELOCITY, PENALTY, MOVE_PENALTY, REWARD, LEARNING_RATE, DISCOUNT, MAX_POS, ACTION_SPACE
 from pyglet.sprite import Sprite
 from libs.gameObjects import gameObjects, preload_image
 from random import randrange
 from math import floor
 
-SIZE = 350
-LOW = 0
-TITLE = "Find The Center"
-
-# CONSTANT VARIABLES
-########################################################
-RED_ARC_DIAMETER = 20
-BLACK_ARC_DIAMETER = 65
-########################################################
 # q_table initialization
-initial_q_table = 'qtable-1582528297.pickle'
+initial_q_table = None
 if initial_q_table is None:
 	q_table = {}
 	for x in range(-SIZE+1, SIZE):
@@ -34,16 +25,16 @@ class findTheCenter(pyglet.window.Window):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.set_location(400,100)
-		self.frame_rate = 1/60.0
+		self.frame_rate = 1/200.0
 
 		self.episodes = 0
 		self.move_count = 0
 
-		self.epsilon = gr.EPSILON
+		self.epsilon = EPSILON
 
 		self.reward = 0
 		self.episode_reward = 0
-		self.episode_rewards = []
+		self.episode_rewards = np.array()
 
 		self.main_batch = pyglet.graphics.Batch()
 		backGround = pyglet.graphics.OrderedGroup(0)
@@ -60,13 +51,12 @@ class findTheCenter(pyglet.window.Window):
 		self.redArc = gameObjects(LOW,LOW,redArc_sprite)
 
 	def rePosition(self):
-		max_pos = SIZE - RED_ARC_DIAMETER
-		self.redArc.posx = randrange(LOW, max_pos, gr.VELOCITY)
-		self.redArc.posy = randrange(LOW, max_pos, gr.VELOCITY)
+		self.redArc.posx = randrange(LOW, MAX_POS, VELOCITY)
+		self.redArc.posy = randrange(LOW, MAX_POS, VELOCITY)
 	
 	def restart(self):
 		self.rePosition()
-		self.epsilon *= gr.EPS_DECAY
+		self.epsilon *= EPS_DECAY
 		self.move_count = 0
 		self.episode_reward = 0
 		self.episodes += 1
@@ -77,55 +67,49 @@ class findTheCenter(pyglet.window.Window):
 
 	def move(self, dt, x=False, y=False):
 		self.redArc.update()
-		if not x:
-			self.redArc.posx += np.random.randint(-1,2)
-		else:
-			self.redArc.posx += x
-
-		if not y:
-			self.redArc.posy += np.random.randint(-1,2)
-		else:
-			self.redArc.posy += y
+		
+		self.redArc.posx += x
+		self.redArc.posy += y
 
 		if self.redArc.posx < LOW:
 			self.redArc.posx = LOW
-		elif self.redArc.posx > SIZE-RED_ARC_DIAMETER:
-			self.redArc.posx = SIZE-RED_ARC_DIAMETER
+		elif self.redArc.posx > MAX_POS:
+			self.redArc.posx = MAX_POS
 
 
 		if self.redArc.posy < LOW:
 			self.redArc.posy = LOW
-		elif self.redArc.posy > SIZE-RED_ARC_DIAMETER:
-			self.redArc.posy = SIZE-RED_ARC_DIAMETER
+		elif self.redArc.posy > MAX_POS:
+			self.redArc.posy = MAX_POS
 
 		# collusion detection
 		colx = floor((SIZE/2)+(BLACK_ARC_DIAMETER/2))
 		coly = floor((SIZE/2)-(BLACK_ARC_DIAMETER/2))
 
 		if self.redArc.posy == SIZE or self.redArc.posx == SIZE or self.redArc.posy == LOW and self.redArc.posx == LOW:
-			self.reward = -gr.PENALTY
+			self.reward = -PENALTY
 		if self.redArc.posy>coly and self.redArc.posy<colx and self.redArc.posx>coly and self.redArc.posx<colx:
 			# print(f'on #{self.episodes}, epsilon: {self.epsilon}, episode mean: {np.mean(self.episode_rewards[-SIZE:])}')
 			print(f"succeed on episode #{self.episodes}, epsilon: {self.epsilon}")
-			self.reward = gr.REWARD
+			self.reward = REWARD
 			
 			self.makeNewObservation()
 			self.restart()
 			
 		else:
-			self.reward = -gr.MOVE_PENALTY
+			self.reward = -MOVE_PENALTY
 
 		self.episode_reward += self.reward
 
 	def action(self, choice, dt):
 		if choice == 0:
-			self.move(dt, x=gr.VELOCITY, y=gr.VELOCITY)
+			self.move(dt, x=VELOCITY, y=VELOCITY)
 		elif choice == 1:
-			self.move(dt, x=-gr.VELOCITY, y=-gr.VELOCITY)
+			self.move(dt, x=-VELOCITY, y=-VELOCITY)
 		elif choice == 2:
-			self.move(dt, x=-gr.VELOCITY, y=gr.VELOCITY)
+			self.move(dt, x=-VELOCITY, y=VELOCITY)
 		elif choice == 3:
-			self.move(dt, x=gr.VELOCITY, y=-gr.VELOCITY)
+			self.move(dt, x=VELOCITY, y=-VELOCITY)
 
 	def makeNewObservation(self):
 		self.observation = (self.redArc-self.blackArc)
@@ -133,19 +117,19 @@ class findTheCenter(pyglet.window.Window):
 		if np.random.random() > self.epsilon:
 			action = np.argmax(q_table[self.observation])
 		else:
-			action = np.random.randint(0,3)
+			action = np.random.randint(0, ACTION_SPACE)
 
 		# new prediction
 		max_future_q = np.max(q_table[self.observation])
 		current_q = q_table[self.observation][action]
 
-		if self.reward == gr.REWARD:
-			new_q = gr.REWARD
-		elif self.reward == -gr.PENALTY:
-			new_q = -gr.PENALTY
+		if self.reward == REWARD:
+			new_q = REWARD
+		elif self.reward == -PENALTY:
+			new_q = -PENALTY
 		else:
 			# q_table optimization formula
-			new_q = (1 - gr.LEARNING_RATE) * current_q + gr.LEARNING_RATE * (self.reward + gr.DISCOUNT * max_future_q)
+			new_q = (1 - LEARNING_RATE) * current_q + LEARNING_RATE * (self.reward + DISCOUNT * max_future_q)
 
 		q_table[self.observation][action] = new_q
 
@@ -153,7 +137,7 @@ class findTheCenter(pyglet.window.Window):
 
 	def update(self, dt):
 		self.move_count += 1
-		if self.move_count != gr.MAX_MOVE:
+		if self.move_count != MAX_MOVE:
 			# if agent finishes the episode
 			self.makeNewObservation()
 			self.action(self.choice, dt)
@@ -165,7 +149,7 @@ class findTheCenter(pyglet.window.Window):
 			self.action(self.choice, dt)
 			self.restart()
 
-		if self.episodes == gr.HM_EPISODES:
+		if self.episodes == HM_EPISODES:
 			# when all episodes are finished
 			moving_avg = np.convolve(self.episode_rewards, np.ones((SIZE,)) / SIZE, mode='valid')
 

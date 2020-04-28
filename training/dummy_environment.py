@@ -1,14 +1,6 @@
-from libs import game_rules as gr
+from libs.game_rules import VELOCITY, PENALTY, REWARD, MOVE_PENALTY, RED_ARC_DIAMETER, BLACK_ARC_DIAMETER, LOW, SIZE, MAX_POS
 from random import randrange
 from math import floor
-
-SIZE = 350
-LOW = 0
-
-RED_ARC_DIAMETER = 20
-BLACK_ARC_DIAMETER = 65
-
-MAX_POS = SIZE - RED_ARC_DIAMETER
 
 class dummy_environment:
 	def __init__(self):
@@ -20,9 +12,9 @@ class dummy_environment:
 		self.episode_reward = 0
 
 	def rePosition(self):
-		self.redArcState_x = randrange(LOW, MAX_POS, gr.VELOCITY)
-		self.redArcState_y = randrange(LOW, MAX_POS, gr.VELOCITY)
-		self.current_state = [self.redArcState_x,self.redArcState_y]
+		self.redArcState_x = randrange(LOW, MAX_POS, VELOCITY)
+		self.redArcState_y = randrange(LOW, MAX_POS, VELOCITY)
+		self.current_state = [self.redArcState_x-self.colx, self.redArcState_y-self.coly]
 
 	def move(self, x, y):
 		self.redArcState_x += x
@@ -30,37 +22,37 @@ class dummy_environment:
 
 		if self.redArcState_x < LOW:
 			self.redArcState_x = LOW
-		elif self.redArcState_x > SIZE-RED_ARC_DIAMETER:
-			self.redArcState_x = SIZE-RED_ARC_DIAMETER
+		elif self.redArcState_x > MAX_POS:
+			self.redArcState_x = MAX_POS
 
 		if self.redArcState_y < LOW:
 			self.redArcState_y = LOW
-		elif self.redArcState_y > SIZE-RED_ARC_DIAMETER:
-			self.redArcState_y = SIZE-RED_ARC_DIAMETER
+		elif self.redArcState_y > MAX_POS:
+			self.redArcState_y = MAX_POS
 
-		self.current_state = [self.redArcState_x,self.redArcState_y]
+		self.current_state = [self.redArcState_x-self.colx, self.redArcState_y-self.coly]
 
 		# collusion detection
 		if self.redArcState_y == SIZE or self.redArcState_x == SIZE or self.redArcState_y == LOW and self.redArcState_x == LOW:
-			reward = -gr.PENALTY
+			reward = -PENALTY
 		if self.redArcState_y>self.coly and self.redArcState_y<self.colx and self.redArcState_x>self.coly and self.redArcState_x<self.colx:
-			reward = gr.REWARD
+			reward = REWARD
 			self.done = True
 		else:
-			reward = -gr.MOVE_PENALTY
+			reward = -MOVE_PENALTY
 
 		self.episode_reward += reward
 
 
 	def step(self, choice):
 		if choice == 0:
-			self.move(x=gr.VELOCITY, y=gr.VELOCITY)
+			self.move(x=VELOCITY, y=VELOCITY)
 		elif choice == 1:
-			self.move(x=-gr.VELOCITY, y=-gr.VELOCITY)
+			self.move(x=-VELOCITY, y=-VELOCITY)
 		elif choice == 2:
-			self.move(x=-gr.VELOCITY, y=gr.VELOCITY)
+			self.move(x=-VELOCITY, y=VELOCITY)
 		elif choice == 3:
-			self.move(x=gr.VELOCITY, y=-gr.VELOCITY)
+			self.move(x=VELOCITY, y=-VELOCITY)
 
 		return self.current_state, self.episode_reward, self.done
 
@@ -68,3 +60,4 @@ class dummy_environment:
 		self.rePosition()
 		self.episode_reward = 0
 		self.done = False
+		return self.current_state
