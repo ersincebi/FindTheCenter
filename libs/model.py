@@ -3,10 +3,11 @@ import tensorflow as tf
 from tensorflow import keras
 from collections import deque
 from libs.game_rules import ACTION_SPACE, OBSERVATION_SPACE, LEARNING_RATE, BATCH_SIZE, DISCOUNT
+from libs.focusing.Kfocusingtf2 import FocusedLayer1D
 
 
+REPLAY_MEMORY = deque(maxlen=2000)
 
-replay_memory = deque(maxlen=2000)
 loss_fn = keras.losses.mean_squared_error
 
 def build_model(N=32
@@ -35,17 +36,7 @@ def build_model(N=32
 		layer = keras.layers.Dense(32, activation="elu")
 
 	elif mode=='focused':
-		pass
-		# layer = FocusedLayer1D(units=N
-		# 					,name='focus-1'
-		# 					,activation='relu'
-		# 					,init_sigma=0.25
-		# 					,init_mu='spread'
-		# 					,init_w= None
-		# 					,train_sigma=True
-		# 					,train_weights=True
-		# 					,train_mu = True
-		# 					,normed=2)
+		layer = FocusedLayer1D(N, name='focus-1', activation='elu', init_sigma=0.25)
 
 	model = keras.models.Sequential([
 		keras.layers.Dense(32, activation="elu", input_shape=OBSERVATION_SPACE),
@@ -58,8 +49,8 @@ def build_model(N=32
 	return model, optimizer
 
 def sample_experiences():
-	indices = np.random.randint(len(replay_memory), size=BATCH_SIZE)
-	batch = [replay_memory[index] for index in indices]
+	indices = np.random.randint(len(REPLAY_MEMORY), size=BATCH_SIZE)
+	batch = [REPLAY_MEMORY[index] for index in indices]
 	states, actions, rewards, next_states, dones = [
 		np.array([experience[field_index] for experience in batch])
 		for field_index in range(5)]
@@ -83,12 +74,12 @@ def training_step(model, optimizer):
 def play_one_step(env, state, epsilon, model):
 	action = epsilon_greedy_policy(model, state, epsilon)
 	next_state, reward, done = env.step(action)
-	replay_memory.append((state, action, reward, next_state, done))
+	REPLAY_MEMORY.append((state, action, reward, next_state, done))
 	return next_state, reward, done, action
 
 def epsilon_greedy_policy(model, state, epsilon=0):
 	if np.random.rand() < epsilon:
-		return np.random.randint(2)
+		return np.random.randint(ACTION_SPACE)
 	else:
 		state = np.array(state)
 		Q_values = model.predict(state[np.newaxis])

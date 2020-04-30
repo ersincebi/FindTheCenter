@@ -1,8 +1,7 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from . import dummy_environment as env
 from libs.model import build_model, play_one_step, training_step
-from libs.game_rules import HM_EPISODES, MAX_MOVE, ACTION_SPACE
+from libs.game_rules import HM_EPISODES, MAX_MOVE, ACTION_SPACE, EPSILON
 from data.plottingData import statistic, plotTheValues
 '''
 from libs.Kfocusing import FocusedLayer1D
@@ -11,7 +10,7 @@ from keras.optimizers import RMSprop
 from keras import backend as K
 '''
 
-model, optimizer = build_model()
+model, optimizer = build_model(mode='focused')
 env = env.dummy_environment()
 
 def train_env():
@@ -22,9 +21,9 @@ def train_env():
 		score = 0
 		obs = env.reset()
 		for step in range(MAX_MOVE):
-			epsilon = max(1 - episode / 500, 0.01)
+			episilon = EPSILON(episode)
 			
-			obs, reward, done, action = play_one_step(env, obs, epsilon, model)
+			obs, reward, done, action = play_one_step(env, obs, episilon, model)
 			
 			choices.append(action)
 
@@ -37,7 +36,7 @@ def train_env():
 		if step > best_score:
 			best_weights = model.get_weights()
 			best_score = step
-		print(f"\rEpisode: {episode+1}, Steps: {step+1}, eps: {epsilon}", end="")
+		print(f"\rEpisode: {episode+1}, Steps: {step+1}, eps: {episilon}", end="")
 		if episode > 50:
 			training_step(model, optimizer)
 
@@ -50,4 +49,4 @@ def main():
 	scores, choices = train_env()
 
 	statistic(scores=scores, choices=choices)
-	plotTheValues(scores=scores, name="findTheCenter")
+	plotTheValues(scores=scores, name="findTheCenterDQN-3")

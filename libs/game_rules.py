@@ -9,11 +9,11 @@ TITLE = "Find The Center"
 HM_EPISODES = 600 # how many episodes
 MAX_MOVE = 150
 MOVE_PENALTY = 1
-PENALTY = 5
-REWARD = 500
+PENALTY = 200
+REWARD = 1000
 
 #how higher is epsilon, agent makes more random action
-EPSILON = 0.5
+EPSILON = lambda episode: max(1 - episode / 500, 0.01)
 EPS_DECAY = 0.9998
 
 LEARNING_RATE = 1e-3

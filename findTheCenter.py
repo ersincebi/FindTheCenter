@@ -25,7 +25,7 @@ class findTheCenter(pyglet.window.Window):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.set_location(400,100)
-		self.frame_rate = 1/200.0
+		self.frame_rate = 1/60.0
 
 		self.episodes = 0
 		self.move_count = 0
@@ -89,8 +89,6 @@ class findTheCenter(pyglet.window.Window):
 		if self.redArc.posy == SIZE or self.redArc.posx == SIZE or self.redArc.posy == LOW and self.redArc.posx == LOW:
 			self.reward = -PENALTY
 		if self.redArc.posy>coly and self.redArc.posy<colx and self.redArc.posx>coly and self.redArc.posx<colx:
-			# print(f'on #{self.episodes}, epsilon: {self.epsilon}, episode mean: {np.mean(self.episode_rewards[-SIZE:])}')
-			print(f"succeed on episode #{self.episodes}, epsilon: {self.epsilon}")
 			self.reward = REWARD
 			
 			self.makeNewObservation()
@@ -138,12 +136,13 @@ class findTheCenter(pyglet.window.Window):
 	def update(self, dt):
 		self.move_count += 1
 		if self.move_count != MAX_MOVE:
-			# if agent finishes the episode
+			# when agent in the episode
 			self.makeNewObservation()
 			self.action(self.choice, dt)
 
 		else:
 			# when episode finished
+			print(f"\rEpisode: {self.episodes+1}, Steps: {self.move_count+1}, eps: {self.epsilon}", end="")
 			self.episode_rewards.append(self.episode_reward)
 			self.makeNewObservation()
 			self.action(self.choice, dt)

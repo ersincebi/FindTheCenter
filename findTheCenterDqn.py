@@ -1,13 +1,11 @@
 import pyglet
 import numpy as np
-import matplotlib.pyplot as plt
-import pickle
-import time
-from libs.game_rules import TITLE, SIZE, LOW, BLACK_ARC_DIAMETER, RED_ARC_DIAMETER, VELOCITY, PENALTY, REWARD, MOVE_PENALTY, MAX_MOVE, HM_EPISODES, MAX_POS, ACTION_SPACE
+from libs.game_rules import TITLE, SIZE, LOW, BLACK_ARC_DIAMETER, RED_ARC_DIAMETER, VELOCITY, PENALTY, REWARD, MOVE_PENALTY, MAX_MOVE, HM_EPISODES, MAX_POS, ACTION_SPACE, EPSILON
 from pyglet.sprite import Sprite
 from libs.gameObjects import gameObjects, preload_image
 from random import randrange
-from math import floor
+from data.plottingData import statistic, plotTheValues
+from libs.model import build_model, training_step, epsilon_greedy_policy, REPLAY_MEMORY
 
 class findTheCenterDqn(pyglet.window.Window):
 	def __init__(self, *args, **kwargs):
@@ -18,9 +16,14 @@ class findTheCenterDqn(pyglet.window.Window):
 		self.episodes = 0
 		self.move_count = 0
 
-		self.reward = 0
-		self.episode_reward = 0
-		self.episode_rewards = np.array()
+		self.score = 0
+		self.episode_score = 0
+		self.best_score = 0
+		self.done = False
+		self.episode_scores = []
+		self.episode_choices = []
+
+		self.epsilon = EPSILON(self.episodes)
 
 		self.main_batch = pyglet.graphics.Batch()
 		backGround = pyglet.graphics.OrderedGroup(0)
@@ -29,10 +32,10 @@ class findTheCenterDqn(pyglet.window.Window):
 		backGround_sprite = Sprite(preload_image('backGround.png'), batch=self.main_batch, group=backGround)
 		self.backGround = gameObjects(LOW,LOW,backGround_sprite)
 
-		pos = floor((SIZE/2)-(BLACK_ARC_DIAMETER/2))
+		pos = np.floor((SIZE/2)-(BLACK_ARC_DIAMETER/2))
 
-		self.colx = floor((SIZE/2)+(BLACK_ARC_DIAMETER/2))
-		self.coly = floor((SIZE/2)-(BLACK_ARC_DIAMETER/2))
+		self.colx = np.floor((SIZE/2)+(BLACK_ARC_DIAMETER/2))
+		self.coly = np.floor((SIZE/2)-(BLACK_ARC_DIAMETER/2))
 
 		blackArc_sprite = Sprite(preload_image('blackArc.png'), batch=self.main_batch, group=foreGround)
 		self.blackArc = gameObjects(pos,pos,blackArc_sprite)
@@ -40,21 +43,22 @@ class findTheCenterDqn(pyglet.window.Window):
 		redArc_sprite = Sprite(preload_image('redArc.png'), batch=self.main_batch, group=foreGround)
 		self.redArc = gameObjects(LOW,LOW,redArc_sprite)
 
-		self.prev_obs = np.array()
-		self.current_state = [self.redArc-self.blackArc]
+		self.prev_obs = np.array([])
+		self.current_state = np.array(self.redArc-self.blackArc)
 
-		self.model = model()
+		self.model, self.optimizer = build_model()
 
 	def rePosition(self):
 		self.redArc.posx = randrange(LOW, MAX_POS, VELOCITY)
 		self.redArc.posy = randrange(LOW, MAX_POS, VELOCITY)
-		self.current_state = [self.redArc-self.blackArc]
+		self.current_state = np.array(self.redArc-self.blackArc)
 	
 	def restart(self):
 		self.rePosition()
-		self.prev_obs = np.array()
+		self.prev_obs = np.array([])
 		self.move_count = 0
-		self.episode_reward = 0
+		self.episode_score = 0
+		self.done = False
 		self.episodes += 1
 
 	def on_draw(self):
@@ -78,23 +82,22 @@ class findTheCenterDqn(pyglet.window.Window):
 		elif self.redArc.posy > MAX_POS:
 			self.redArc.posy = MAX_POS
 
-		self.current_state = [self.redArc-self.blackArc]
+		self.current_state = np.array(self.redArc-self.blackArc)
 
 		# collusion detection
 		if self.redArc.posy == SIZE or self.redArc.posx == SIZE or self.redArc.posy == LOW and self.redArc.posx == LOW:
-			self.reward = -PENALTY
+			self.score = -PENALTY
 		if self.redArc.posy>self.coly and self.redArc.posy<self.colx and self.redArc.posx>self.coly and self.redArc.posx<self.colx:
-			# print(f'on #{self.episodes}, epsilon: {self.epsilon}, episode mean: {np.mean(self.episode_rewards[-SIZE:])}')
-			print(f"succeed on episode #{self.episodes}")
-			self.reward = REWARD
+			self.score = REWARD
+			self.done = True
 			
 			self.makeNewPrediction()
 			self.restart()
 			
 		else:
-			self.reward = -MOVE_PENALTY
+			self.score = -MOVE_PENALTY
 
-		self.episode_reward += self.reward
+		self.episode_score += self.score
 
 	def action(self, choice, dt):
 		if choice == 0:
@@ -107,38 +110,35 @@ class findTheCenterDqn(pyglet.window.Window):
 			self.move(dt, x=VELOCITY, y=-VELOCITY)
 
 	def makeNewPrediction(self):
-		if len(self.prev_obs)!=0:
-			self.prev_obs = np.array(self.prev_obs)
-			action = np.argmax(self.model.predict(self.prev_obs.reshape(-1, len(self.prev_obs), 1))[0])
-		else:
-			action = np.random.randint(0, ACTION_SPACE)
+		self.choice = epsilon_greedy_policy(self.model, self.current_state, self.epsilon)
+
+		REPLAY_MEMORY.append((self.prev_obs, self.choice, self.score, self.current_state, self.done))
 
 		self.prev_obs = self.current_state
 
-		self.choice = action
+		self.episode_choices.append(self.choice)
 
 	def update(self, dt):
 		self.move_count += 1
 		if self.move_count != MAX_MOVE:
-			# if agent finishes the episode
+			# when agent in the episode
+			self.epsilon = EPSILON(self.episodes)
+
 			self.makeNewPrediction()
 			self.action(self.choice, dt)
 
 		else:
 			# when episode finished
-			self.episode_rewards.append(self.episode_reward)
+			print(f"\rEpisode: {self.episodes+1}, Steps: {self.move_count+1}, eps: {self.epsilon}", end="")
+			self.episode_scores.append(self.episode_score)
 			self.makeNewPrediction()
 			self.action(self.choice, dt)
 			self.restart()
 
 		if self.episodes == HM_EPISODES:
 			# when all episodes are finished
-			moving_avg = np.convolve(self.episode_rewards, np.ones((SIZE,)) / SIZE, mode='valid')
-
-			plt.plot([i for i in range(len(moving_avg))], moving_avg)
-			plt.xlabel(f'reward {SIZE} moving avarage')
-			plt.ylabel('episode #')
-			plt.show()
+			statistic(scores=self.episode_scores, choices=self.episode_choices)
+			plotTheValues(scores=self.episode_scores, name="findTheCenterDQN-1")
 
 
 if __name__ == '__main__':

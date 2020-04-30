@@ -1,18 +1,38 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jul 27 15:36:24 2019
+Created on Monday April 27 15:36:24 2020
 
 @author: btek
+
+This file contains 1D focusing layer implementation: FocusedLayer1D 
+in tensorflow 2 keras.
+There are some differerences from the early implementation in Keras-TF.1.4. 
+
+1) Keras utils Optimizers do not work with tf2. Because tf2 optimizers are 
+very different. Solution for this can be to cancel model.fit function and use
+gradient tapes and do the training differently for Mu and Sigma. 
+I have chosen a simple walk-around solution. I have added a ClipCallBack 
+function to keras_utils. This works with all optimizers. However we can not
+give separate learning rates.
+
+Clipping could be done with tf.Constraints also but not sure how it works.
+
+2) This file includes the model and tests (mnist,cifar-10, lfw-faces)
+3) It requires keras_utils.py for ClipCallback
+
+Running the file would train mnist 2-hidden focused layer network. 
+Unfortunately, IT DOES NOT REACH 99.25~ without separate learning rates.
+STILL WORKS BETTER THAN DENSE!
 """
 
-from keras import backend as K
-from keras.engine.topology import Layer
-from keras import activations, regularizers, constraints
-from keras import initializers
-from keras.engine import InputSpec
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import Layer
+from tensorflow.keras import activations, regularizers, constraints
+from tensorflow.keras import initializers
+from tensorflow.keras.layers import InputSpec
 
 
 #Keras TF implementation of Focusing Neuron.
@@ -39,6 +59,8 @@ class FocusedLayer1D(Layer):
                  reg_bias=None,
                  normed=2,
                  verbose=False,
+                 perrow=False,
+                 sharedWeights=0,
                  **kwargs):
         if 'input_shape' not in kwargs and 'input_dim' in kwargs:
             kwargs['input_shape'] = (kwargs.pop('input_dim'),)
@@ -64,7 +86,9 @@ class FocusedLayer1D(Layer):
         self.train_weights = train_weights
         self.normed = normed
         self.verbose = verbose
+        self.sharedWeights = sharedWeights
         self.sigma=None
+        self.perrow=perrow # by this setting every row gets one neuron. 
         
             
         if 'input_shape' not in kwargs and 'input_dim' in kwargs:
@@ -88,10 +112,12 @@ class FocusedLayer1D(Layer):
         idxs = np.linspace(0, 1.0,self.input_dim)
         idxs = idxs.astype(dtype='float32')
         
+        # idx is not trainable
         self.idxs = K.constant(value=idxs, shape=(self.input_dim,), 
                                    name="idxs")
         
-        from keras.initializers import constant
+        
+        constant = initializers.constant
          # create trainable params.
         self.mu = self.add_weight(shape=(self.units,), 
                                   initializer=constant(mu), 
@@ -102,9 +128,8 @@ class FocusedLayer1D(Layer):
                                      name="Sigma", 
                                      regularizer=self.si_regularizer,
                                      trainable=self.train_sigma)
-        # idx is not trainable
-        
-      
+    
+          
         # value caps for MU and SI values
         # however these can change after gradient update.
         # MINIMUM SIGMA CAN EFFECT THE PERFORMANCE.
@@ -117,8 +142,13 @@ class FocusedLayer1D(Layer):
         self.MAX_SI = np.float32(MAX_SI)#, dtype='float32')
         
         w_init = initializers.get(self.kernel_initializer) if self.kernel_initializer else self.weight_initializer_fw_bg
-        #print("FOCUSING NEURON WEIGHT INIT", w_init)
-        self.W = self.add_weight(shape=(self.input_dim, self.units),
+        #w_init = initializers.get(self.kernel_initializer) if self.kernel_initializer else self.weight_initializer_delta_ortho
+        #w_init = initializers.get(self.kernel_initializer) if self.kernel_initializer else self.weight_initializer_sr_sc
+        w_shape = (self.input_dim, self.units)
+        if self.sharedWeights>0:
+            w_shape=(self.input_dim, self.sharedWeights) # just one copy of weights
+            
+        self.W = self.add_weight(shape=w_shape,
                                       initializer=w_init,
                                       name='Weights',
                                       regularizer=self.kernel_regularizer,
@@ -135,16 +165,23 @@ class FocusedLayer1D(Layer):
         
         self.built = True
         
-        #super(FocusedLayer1D, self).build(input_shape)  # Be sure to call this somewhere!
+        #super(FocusedLayer1D, self).build(input_shape)  # Make sure to call this somewhere!
         
-        #super(FocusedLayer1D, self).build(input_shape)
         
     def call(self, inputs):
         u = self.calc_U()
         if self.verbose:
             print("weights shape", self.W.shape)
-        self.kernel = self.W*u
-        output = K.dot(inputs, self.kernel)
+        W = self.W
+        if self.sharedWeights>0:
+            W = K.tile(W,[1,u.shape[1]//W.shape[1]])
+            print(W.shape)
+        self.kernel = W*u
+        
+        if not self.perrow:
+            output = K.dot(inputs, self.kernel)   # XW
+        else:
+            output = K.sum(inputs * self.kernel, axis=-1)   # Sum(X.*W)over rows.
         if self.use_bias:
             output = K.bias_add(output, self.bias, data_format='channels_last')
         if self.activation is not None:
@@ -173,7 +210,7 @@ class FocusedLayer1D(Layer):
             'kernel_constraint': constraints.serialize(self.kernel_constraint),
             'bias_constraint': constraints.serialize(self.bias_constraint),
         }
-        base_config = super(FocusedLayer1D, self).get_config()
+        base_config = super(self.__class__, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
     
     def weight_initializer(self,shape):
@@ -218,11 +255,17 @@ class FocusedLayer1D(Layer):
         return W
 
     def weight_initializer_fw_bg(self,shape, dtype='float32'):
-        #only implements channel last and HE uniform
+        '''
+        Initializes weights for focusing neuron. The main idea is that
+        gaussian focus effects the input variance. The weights must be
+        initialized by considering focus coefficients norm"
+        '''
+        # the paper results were taken with this. 
         initer = 'Glorot'
         distribution = 'uniform'
         
         kernel = K.eval(self.calc_U())
+        dtype = dtype.as_numpy_dtype()
         
         W = np.zeros(shape=shape, dtype=dtype)
         # for Each Gaussian initialize a new set of weights
@@ -242,6 +285,111 @@ class FocusedLayer1D(Layer):
                 #fan_in *= self.input_channels no need for this in repeated U. 
                 if initer == 'He':
                     std = self.gain * sqrt32(2.0) / sqrt32(fan_in)
+                else:
+                    #std = self.gain * sqrt32(1.0) / sqrt32(W.shape[1])
+                    std = self.gain * sqrt32(2.0) / sqrt32(fan_in+fan_out)
+                
+                std = np.float32(std)
+                if c == 0 and verbose:
+                    print("Std here: ",std, type(std),W.shape[0],
+                          " fan_in", fan_in, "mx U", np.max(kernel[:,:,:,c]))
+                    print(r,",",c," Fan in ", fan_in, " Fan_out:", fan_out, W[r,c])
+                    
+                if distribution == 'uniform':
+                    std = std * sqrt32(3.0)
+                    std = np.float32(std)
+                    w_vec = np.random.uniform(low=-std, high=std, size=1)
+                elif distribution == 'normal':
+                    std = std/ np.float32(.87962566103423978)           
+                    w_vec = np.random.normal(scale=std, size=1)
+                    
+                W[r,c] = w_vec.astype('float32')
+                
+        return W
+    
+    def weight_initializer_sr_sc(self,shape, dtype='float32'):
+        '''
+        Initializes weights for focusing neuron. The main idea is that
+        gaussian focus effects the input variance. The weights must be
+        initialized by considering focus coefficients norm"
+        '''
+        # the paper results were taken with this. 
+        initer = 'Glorot'
+        distribution = 'uniform'
+        
+        kernel = K.eval(self.calc_U())
+        
+        W = np.zeros(shape=shape, dtype=dtype)
+        # for Each Gaussian initialize a new set of weights
+        verbose=self.verbose
+        if verbose:
+            print("Kernel max, mean, min: ", np.max(kernel), np.mean(kernel), np.min(kernel))
+            print("kernel shape:", kernel.shape, ", W shape: ",W.shape)
+        
+        #fan_out = self.units
+        sum_over_domain = np.sum(kernel**2,axis=1) # r base
+        sum_over_neuron = np.sum(kernel**2,axis=0)
+        print("fan Out fan in", sum_over_domain, sum_over_neuron)
+        fan_out = np.median(sum_over_domain)
+        fan_in = np.median(sum_over_neuron)
+        print("fan Out fan in", fan_out, fan_in)
+                
+        for c in range(W.shape[1]):
+            for r in range(W.shape[0]):
+                
+                #fan_in *= self.input_channels no need for this in repeated U. 
+                if initer == 'He':
+                    std = self.gain * 2.0 / sqrt32(fan_in)
+                else:
+                    #std = self.gain * sqrt32(1.0) / sqrt32(W.shape[1])
+                    std = self.gain *  2.0 / sqrt32(fan_in+fan_out)
+                
+                std = np.float32(std)
+                if c == 0 and verbose:
+                    print("Std here: ",std, type(std),W.shape[0],
+                          " fan_in", fan_in, "mx U", np.max(kernel[:,:,:,c]))
+                    print(r,",",c," Fan in ", fan_in, " Fan_out:", fan_out, W[r,c])
+                    
+                if distribution == 'uniform':
+                    std = std * sqrt32(3.0)
+                    std = np.float32(std)
+                    w_vec = np.random.uniform(low=-std, high=std, size=1)
+                elif distribution == 'normal':
+                    std = std/ np.float32(.87962566103423978)           
+                    w_vec = np.random.normal(scale=std, size=1)
+                    
+                W[r,c] = w_vec.astype('float32')
+              
+        return W
+    
+    
+    def weight_initializer_dif_var(self,shape, dtype='float32'):
+        # this does not work better
+        initer = 'He'
+        distribution = 'uniform'
+        
+        kernel = K.eval(self.calc_U())
+        
+        W = np.zeros(shape=shape, dtype=dtype)
+        # for Each Gaussian initialize a new set of weights
+        verbose=self.verbose
+        #if verbose:
+        print("Kernel max, mean, min: ", np.max(kernel), np.mean(kernel), np.min(kernel))
+        print("kernel shape:", kernel.shape, ", W shape: ",W.shape)
+        
+        
+        fan_out = self.units
+        #MIN_FOC = 0.5
+        #MAX_FOC = np.max(kernel)
+        N = W.shape[0]
+        for c in range(W.shape[1]):
+            for r in range(W.shape[0]):
+                fan_in = kernel[r,c]
+                #fan_in = fan_in if fan_in>=MIN_FOC else (MAX_FOC-fan_in)
+                
+                #fan_in *= self.input_channels no need for this in repeated U. 
+                if initer == 'He':
+                    std = self.gain * sqrt32(2.0) / (sqrt32(N)*fan_in)
                 else:
                     std = self.gain * sqrt32(2.0) / sqrt32(fan_in+fan_out)
                 
@@ -263,10 +411,45 @@ class FocusedLayer1D(Layer):
                 
         return W
     
+    def weight_initializer_delta_ortho(self,shape, dtype='float32'):
+        # this does not work better
+        initer = 'He'
+        distribution = 'uniform'
+        
+        kernel = K.eval(self.calc_U())
+        
+        W = np.zeros(shape=shape, dtype=dtype)
+        # for Each Gaussian initialize a new set of weights
+        verbose=self.verbose
+        #if verbose:
+        print("Kernel max, mean, min: ", np.max(kernel), np.mean(kernel), np.min(kernel))
+        print("kernel shape:", kernel.shape, ", W shape: ",W.shape)
+        
+        mu, si = mu_si_initializer(self.init_mu, self.init_sigma, self.input_dim,
+                                   self.units)
+        mu =np.int32(mu*W.shape[0])
+        print(mu)
+        std = sqrt32(1.0)
+        for n in range(W.shape[1]):
+            #W[mu[n], n] =  np.random.choice([-std,std], size=1) #np.random.uniform(low=-std, high=std, size=1)#/W.shape[0])/kernel[mu[n],n]
+            #W[mu[n], n] =  std*0.25 # 
+            #W[mu[n], n] =  std*1.0/W.shape[0] # 
+            W[mu[n], n] = std
+                            
+            
+        #print(W[:,0])
+        #print(W[:,1])
+        
+        return W.astype('float32')
+    
     def calc_U(self,verbose=False):
         """
         function calculates focus coefficients. 
-        normalizes and prunes if
+        normalization has three options. 
+        1) no normalization. Max u is 1.0, min u is 0.0 because of exp(-x)
+        2) norm_1: the coefficient vector norm is 1.0. sum(sqr(u))==1
+        3) norm_2: the coefficient vector norm is  sum(sqr(u))==sqr(n_inputs)
+            norm 2 is to match the norm 1.0 when sigma is very large
         """
         up= (self.idxs - K.expand_dims(self.mu,1))**2
         #print("up.shape", up.shape)
@@ -279,7 +462,7 @@ class FocusedLayer1D(Layer):
         #scaler = (np.pi*self.cov_scaler**2) * (self.idxs.shape[0])
         #print("down shape :",dwn.shape)
         result = K.exp(-up / dwn)
-        # kernel= K.eval(result)
+        #kernel= K.eval(result)
         
         if self.normed==1:
             result /= K.sqrt(K.sum(K.square(result), axis=-1,keepdims=True))
@@ -287,19 +470,14 @@ class FocusedLayer1D(Layer):
         elif self.normed==2:
             result /= K.sqrt(K.sum(K.square(result), axis=-1,keepdims=True))
             result *= K.sqrt(K.constant(self.input_dim))
+        
+        elif self.normed==3:
+            result += 0.1 # adding a bias
 
             if verbose:
                 kernel= K.eval(result)
                 print("RESULT after NORMED max, mean, min: ", np.max(kernel), np.mean(kernel), np.min(kernel))
-            #
-        #Normalize to get equal to WxW Filter
-        #masks *= K.sqrt(K.constant(self.input_channels*self.kernel_size[0]*self.kernel_size[1]))
-        # make norm sqrt(filterw x filterh x self.incoming_channel)
-        # the reason for this is if you take U all ones(self.kernel_size[0],kernel_size[1], num_channels)
-        # its norm will sqrt(wxhxc)
-        #print("Vars: ",self.input_channels,self.kernel_size[0],self.kernel_size[1])
-        
-        
+      
         return K.transpose(result)
 
         
@@ -308,6 +486,8 @@ def mu_si_initializer(initMu, initSi, num_incoming, num_units, verbose=True):
     Initialize focus centers and sigmas with regards to initMu, initSi
     
     initMu: a string, a value, or a numpy.array for initialization
+    spread2d : is trying to distribute initial points on a 2D grid. This is incomplete,
+    may have a bug. See try_mu_initializer.py
     initSi: a string, a value, or a numpy.array for initialization
     num_incoming: number of incoming inputs per neuron
     num_units: number of neurons in this layer
@@ -322,11 +502,30 @@ def mu_si_initializer(initMu, initSi, num_incoming, num_units, verbose=True):
             mu += (np.random.rand(len(mu))-0.5)*(1.0/(float(20.0)))  # On paper we have this initalization                
             
         elif initMu == 'spread':
-            #paper results were taken with this. IT EFFECTS RESULTS!!!
+            #paper results were taken with np.linspace(0.2, 0.8, num_units)  . 
+            # THIS AFFECTS RESULTS!!!
             mu = np.linspace(0.2, 0.8, num_units)  
+            #mu = np.linspace(0.0, 1.0, num_units)  
             #mu = np.linspace(0.1, 0.9, num_units)
-        else:
-            print(initMu, "Not Implemented")
+        elif initMu == 'spread2d':
+            # I create 2D grid equally distributed to cover most of the image
+            # howewer this assumes gray scale I need a color version
+            in_wid = np.sqrt(num_incoming)
+            ns = np.sqrt(num_units)
+            if in_wid != int(in_wid) or ns!=int(in_wid):
+                print(initMu, "Works best in square images")
+            
+            in_wid= int(in_wid)
+            in_hei = num_incoming//in_wid
+            
+            ns_wid= int(ns)
+            ns_hei = num_units//ns_wid
+            ns_min = min(ns_wid,ns_hei)
+            vert = np.linspace(in_hei*0.2,in_hei*0.8, ns_min) 
+            hor = np.linspace(in_wid*0.2,in_wid*0.8, ns_min)
+
+            mu_ = vert*in_wid
+            mu= (mu_+ hor[:,np.newaxis]).reshape(in_wid*in_hei) / (num_incoming)
             
     elif isinstance(initMu, float):  #initialize it with the given scalar
         mu = np.repeat(initMu, num_units)  # 
@@ -343,8 +542,11 @@ def mu_si_initializer(initMu, initSi, num_incoming, num_units, verbose=True):
     if isinstance(initSi,str):
         if initSi == 'random':
             si = np.random.uniform(low=0.05, high=0.25, size=num_units)
-        elif initSi == 'spread':
-            si = np.repeat((initSi / num_units), num_units)
+        elif initSi == 'normal':
+            si = np.random.uniform(low=0.05, high=0.25, size=num_units)
+            #si = np.repeat((initSi / num_units), num_units)
+            pass
+            print("not implemented")
 
     elif isinstance(initSi,float):  #initialize it with the given scalar
         si = np.repeat(initSi, num_units)# 
@@ -366,7 +568,7 @@ def mu_si_initializer(initMu, initSi, num_incoming, num_units, verbose=True):
 
 def U_numeric(idxs, mus, sis, scaler, normed=2):
     '''
-    This function provides a numeric computed focus coefficient vector for
+    This function provides a numeric computed focus coefficient vector for plots
     
     idxs: the set of indexes (positions) to calculate Gaussian focus coefficients
     
@@ -394,7 +596,8 @@ def U_numeric(idxs, mus, sis, scaler, normed=2):
 
 def calculate_fi_and_weights(layer_instance):
     ''' 
-    This aux function calculates its focus functions, focused weights for a given
+    This aux function calculates its focus functions, 
+    focused weights for a given
     a layer instance
     '''
     w = layer_instance.get_weights()
@@ -402,21 +605,42 @@ def calculate_fi_and_weights(layer_instance):
     si = w[1]
     we = w[2]
     idxs = np.linspace(0, 1.0,layer_instance.input_shape[1])
-    fi = U_numeric(idxs, mu,si, scaler=1.0, normed=2)
+    fi = U_numeric(idxs, mu, si, scaler=1.0, normed=2)
     fiwe =  fi*we
     
     return fi, we, fiwe
 
+def prune_out_of_focus_weights(layer_instance, threshold=1e-8):
+    ''' 
+    This aux function prunes weights using focus function value
+    '''
+    w = layer_instance.get_weights()
+    fi, we, fiwe = calculate_fi_and_weights(layer_instance)
+    in_focus = (fi>threshold).astype('float')
+    we_p = we*in_focus
+    w[2]=we_p
+    layer_instance.set_weights(w)
+    
+    return fi, in_focus, we_p
 
 def sqrt32(x):
     return np.sqrt(x,dtype='float32')
+    
+
+#%% For tests
+  
   
     
 def create_simple_model(input_shape, num_classes=10, settings={}):
-    from keras.models import  Model
-    from keras.layers import Input, Dense, Dropout, Flatten, BatchNormalization
-    from keras.layers import Activation, Permute,Concatenate, MaxPool2D
-    from keras.regularizers import l2
+    from tensorflow.keras.models import  Model
+    from tensorflow.keras.layers import Input, Dense, Dropout, Flatten, BatchNormalization, AlphaDropout
+    from tensorflow.keras.layers import Activation # MaxPool2D
+    act_func = 'relu'
+    act_func = 'selu'
+    act_func = 'relu'
+    #drp_out = AlphaDropout
+    drp_out = Dropout
+    #from keras.regularizers import l2
     
     node_in = Input(shape=input_shape, name='inputlayer')
 
@@ -438,14 +662,15 @@ def create_simple_model(input_shape, num_classes=10, settings={}):
                                    train_weights=settings['focus_train_weights'],
                                    si_regularizer=settings['focus_sigma_reg'],
                                    train_mu = settings['focus_train_mu'],
-                                   normed=settings['focus_norm_type'])(node_)
+                                   normed=settings['focus_norm_type'],
+                                   gain=1.0,sharedWeights=0)(node_)
         else:
             node_ = Dense(nh,name='dense-'+str(h),activation='linear',
                           kernel_initializer=heu())(node_)
         
         node_ = BatchNormalization()(node_)
-        node_ = Activation('relu')(node_)
-        node_ = Dropout(0.25)(node_)
+        node_ = Activation(act_func)(node_)
+        node_ = drp_out(0.25)(node_)
         h = h + 1
     
     node_fin = Dense(num_classes, name='softmax', activation='softmax', 
@@ -460,12 +685,12 @@ def create_simple_model(input_shape, num_classes=10, settings={}):
 def create_simple_residual_model(input_shape,num_classes=10, settings={}):
     from keras.models import  Model
     from keras.layers import Input, Dense, Dropout, Flatten, BatchNormalization
-    from keras.layers import Activation, Permute,Concatenate, MaxPool2D,Add, AveragePooling2D
-    from keras.regularizers import l2
+    from keras.layers import Activation, AveragePooling2D #,Add
+    #from keras.regularizers import l2
     node_in = Input(shape=input_shape, name='inputlayer')
     
     node_in_pooled = AveragePooling2D()(node_in)
-    node_in_pooled_fl =Flatten(data_format='channels_last')(node_in_pooled)
+    #node_in_pooled_fl =Flatten(data_format='channels_last')(node_in_pooled)
     node_fl = Flatten(data_format='channels_last')(node_in)
     #node_fl = node_in
     node_ = Dropout(0.2)(node_fl)
@@ -496,7 +721,7 @@ def create_simple_residual_model(input_shape,num_classes=10, settings={}):
         node_ = BatchNormalization()(node_)
         #node_ = Add()([node_, node_in_pooled_fl])
         node_ = Activation('relu')(node_)
-        node_ = Dropout(0.25)(node_)
+        node_ = Dropout(0.5)(node_)
         h = h + 1
     
     node_fin = Dense(num_classes, name='softmax', activation='softmax', 
@@ -510,10 +735,9 @@ def create_simple_residual_model(input_shape,num_classes=10, settings={}):
     
 
 def create_cnn_model(input_shape,  num_classes=10, settings={}):
-    from keras.models import  Model
-    from keras.layers import Input, Dense, Dropout, Flatten,Conv2D, BatchNormalization
-    from keras.layers import Activation, Permute,Concatenate, MaxPool2D
-    from keras.regularizers import l2
+    from tensorflow.keras.models import  Model
+    from tensorflow.keras.layers import Input, Dense, Dropout, Flatten,Conv2D, BatchNormalization
+    from tensorflow.keras.layers import Activation, MaxPool2D
     
     node_in = Input(shape=input_shape, name='inputlayer')
     
@@ -574,15 +798,17 @@ def create_cnn_model(input_shape,  num_classes=10, settings={}):
         
 
 def test_comp(settings,random_sid=9):
-    import keras
-    from keras.optimizers import SGD
-    from keras.datasets import mnist,fashion_mnist, cifar10    
-    from skimage import filters
-    from keras import backend as K
-    from keras_utils import WeightHistory as WeightHistory
-    from keras_utils import RecordVariable, \
-    PrintLayerVariableStats, PrintAnyVariable, SGDwithLR, eval_Kdict, standarize_image_025
-    from keras_preprocessing.image import ImageDataGenerator
+    import tensorflow.keras as keras4
+    #from keras.optimizers import SGD
+    from tensorflow.keras.datasets import mnist,fashion_mnist, cifar10    
+    #from skimage import filters
+    from tensorflow.keras import backend as K
+    #from keras_utils import WeightHistory as WeightHistory
+    from keras_utils_tf2 import RecordVariable, RecordOutput, \
+    PrintLayerVariableStats, SGDwithLR, eval_Kdict, standarize_image_025,\
+    standarize_image_01, AdamwithClip, ClipCallback
+    
+    from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
     K.clear_session()
     
@@ -591,8 +817,7 @@ def test_comp(settings,random_sid=9):
 
     sid = random_sid  
     np.random.seed(sid)
-    tf.random.set_random_seed(sid)
-    tf.compat.v1.random.set_random_seed(sid)
+    tf.random.set_seed(sid)
     
     # MINIMUM SIGMA CAN EFFECT THE PERFORMANCE.
     # BECAUSE NEURON CAN GET SHRINK TOO MUCH IN INITIAL EPOCHS WITH LARGER GRADIENTS
@@ -602,18 +827,19 @@ def test_comp(settings,random_sid=9):
     MIN_MU = 0.0
     MAX_MU = 1.0
     lr_dict = {'all':settings['lr_all']} #0.1 is default for MNIST
-    mom_dict = {'all':0.9}           
-    decay_dict = {'all':0.9}
+    mom_dict = {'all':0.9}    
+    decay_dict = {'all':0.5} # works 99.29 with mnist
     clip_dict ={}
+    #UPDATE_Clip = 0.25
     for i,n in enumerate(settings['nhidden']):
-            lr_dict.update({'focus-'+str(i+1)+'/Sigma:0':0.01})
-            lr_dict.update({'focus-'+str(i+1)+'/Mu:0':0.01})
+            lr_dict.update({'focus-'+str(i+1)+'/Sigma:0':0.01}) # best results 0.01
+            lr_dict.update({'focus-'+str(i+1)+'/Mu:0':0.01}) #best results 0.01
             lr_dict.update({'focus-'+str(i+1)+'/Weights:0':0.1})
             
             mom_dict.update({'focus-'+str(i+1)+'/Sigma:0':0.9})
             mom_dict.update({'focus-'+str(i+1)+'/Mu:0':0.9})
             
-            decay_dict.update({'focus-'+str(i+1)+'/Sigma:0':0.5})
+            decay_dict.update({'focus-'+str(i+1)+'/Sigma:0':0.5})  #best results 0.5
             decay_dict.update({'focus-'+str(i+1)+'/Mu:0':0.9})
             
             clip_dict.update({'focus-'+str(i+1)+'/Sigma:0':(MIN_SIG,MAX_SIG)})
@@ -621,7 +847,7 @@ def test_comp(settings,random_sid=9):
             
     print("Loading dataset")
     if settings['dset']=='mnist':
-        # input image dimensions
+        # input image dimensions 
         img_rows, img_cols = 28, 28  
         # the data, split between train and test sets
         (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -715,7 +941,7 @@ def test_comp(settings,random_sid=9):
         
         plt.imshow(X[0].reshape((img_rows,img_cols)))
         plt.show()
-        lr_dict = {'all':0.001}
+        lr_dict = {'all':0.5}
         
         e_i = x_train.shape[0] // batch_size
         decay_epochs =np.array([e_i*50,e_i*100, e_i*150], dtype='int64')
@@ -735,22 +961,30 @@ def test_comp(settings,random_sid=9):
         
         x_train = x_train.astype('float32')
         x_test = x_test.astype('float32')
-    
+        
+        #x_train, _, x_test = standarize_image_01(x_train, tst=x_test)
         x_train, _, x_test = standarize_image_025(x_train, tst=x_test)
         x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, n_channels)
         x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, n_channels)
-        
-    input_shape = (img_rows, img_cols, n_channels)
+    
+    input_shape = (img_rows, img_cols, n_channels)    
+    # convert class vectors to binary class matrices
+    y_train = tf.keras.utils.to_categorical(y_train, num_classes)
+    y_test = tf.keras.utils.to_categorical(y_test, num_classes)
+
+    #from keras_data_tf2 import load_dataset
+    #dset = settings['dset']
+    #ld_data = load_dataset(dset,normalize_data=True,options=[])
+    #x_train,y_train,x_test,y_test,input_shape,num_classes=ld_data
+    
+    
     
     print('x_train shape:', x_train.shape)
     print(x_train.shape[0], 'train samples')
     print(x_test.shape[0], 'test samples')
     
-    # convert class vectors to binary class matrices
-    y_train = keras.utils.to_categorical(y_train, num_classes)
-    y_test = keras.utils.to_categorical(y_test, num_classes)
     sigma_reg = settings['focus_sigma_reg']
-    sigma_reg = keras.regularizers.l2(sigma_reg) if sigma_reg is not None else sigma_reg
+    sigma_reg = tf.keras.regularizers.l2(sigma_reg) if sigma_reg is not None else sigma_reg
     settings['focus_sigma_reg'] = sigma_reg
     if settings['cnn_model']:
         model=create_cnn_model(input_shape,num_classes, settings=settings)
@@ -759,17 +993,20 @@ def test_comp(settings,random_sid=9):
     
  
     model.summary()
-    
-    print (lr_dict)
-    print (mom_dict)
-    print (decay_dict)
-    print (clip_dict)
-    
-    opt= SGDwithLR(lr_dict, mom_dict,decay_dict,clip_dict, decay_epochs)#, decay=None)
 
-    model.compile(loss=keras.losses.categorical_crossentropy,
+    #opt= SGDwithLR(lr_dict, mom_dict,decay_dict,clip_dict, 
+    #               decay_epochs,clipvalue=1.0)#, decay=None)
+    #opt = AdamwithClip(clips=clip_dict)
+    #opt= SGDwithLR(lr_dict, mom_dict,decay_dict,clip_dict, 
+    #                decay_epochs,update_clip=UPDATE_Clip)#, decay=None)
+    
+    opt = tf.keras.optimizers.SGD(lr=0.05, momentum=0.9, clipvalue=1.0)
+    #opt = tf.keras.optimizers.Adam(lr=1e-3, clipvalue=1.0)
+                   
+    model.compile(loss=tf.keras.losses.categorical_crossentropy,
                   optimizer=opt,
                   metrics=['accuracy'])
+    
     
     
         
@@ -778,22 +1015,28 @@ def test_comp(settings,random_sid=9):
     #callbacks = [tb]
     callbacks = []
     
+    
+    red_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.9, patience=10, verbose=1, mode='auto', min_delta=0.0001, cooldown=10, min_lr=1e-5)
+    
+    callbacks+=[red_lr]
+    
     if  settings['neuron']=='focused':
+        ccp1 = ClipCallback('Sigma',[MIN_SIG,MAX_SIG])
+        ccp2 = ClipCallback('Mu',[MIN_MU,MAX_MU])
+        #ccp = ClipCallback('Sigma',[MIN_SIG,MAX_SIG])
         pr_1 = PrintLayerVariableStats("focus-1","Weights:0",stat_func_list,stat_func_name)
         pr_2 = PrintLayerVariableStats("focus-1","Sigma:0",stat_func_list,stat_func_name)
         pr_3 = PrintLayerVariableStats("focus-1","Mu:0",stat_func_list,stat_func_name)
-        rv_weights_1 = RecordVariable("focus-1","Weights:0")
-        rv_sigma_1 = RecordVariable("focus-1","Sigma:0")
-        rv_mu_1 = RecordVariable("focus-1","Mu:0")
-        print_lr_rates_callback = keras.callbacks.LambdaCallback(
-                on_epoch_end=lambda epoch, logs: print("iter: ", 
-                                                       K.eval(model.optimizer.iterations),
-                                                       " LR RATES :", 
-                                                       eval_Kdict(model.optimizer.lr)))
-    
-        callbacks+=[pr_1,pr_2,pr_3,rv_weights_1,rv_sigma_1, rv_mu_1,
-                    print_lr_rates_callback]
-    
+        #pr_4 = PrintLayerVariableStats("focus-2","Sigma:0",stat_func_list,stat_func_name)
+        #red_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.9, patience=10, verbose=1, mode='auto', min_delta=0.0001, cooldown=0, min_lr=1e-5)
+        #schedule = lambda epoch: np.exp()
+        
+        callbacks += [ccp1, ccp2, pr_1, pr_2, pr_3]    
+
+
+
+
+
     if not settings['augment']:
         print('Not using data augmentation.')
         history=model.fit(x_train, y_train,
@@ -883,7 +1126,7 @@ def repeated_trials(test_function=None, settings={}):
     timestr = now.strftime("%Y%m%d-%H%M%S")
     
     filename = 'outputs/Kfocusing/'+settings['dset']+'/'+timestr+'_'+settings['neuron']+'.model_results.npz'
-    copyfile("Kfocusing.py",filename+"code.py")
+    #copyfile("Kfocusingtf2.py",filename+"code.py")
    
     for s in range(len(sigmas)): # sigmas loop, should be safe if it is empty
         for i in range(settings['repeats']):
@@ -913,8 +1156,9 @@ def repeated_trials(test_function=None, settings={}):
     
 if __name__ == "__main__":
     import os
-    os.environ['CUDA_VISIBLE_DEVICES']="0"
-    os.environ['TF_FORCE_GPU_ALLOW_GROWTH']="true"
+    if 'CUDA_VISIBLE_DEVICES' not in os.environ.keys():
+        os.environ['CUDA_VISIBLE_DEVICES']="0"
+        os.environ['TF_FORCE_GPU_ALLOW_GROWTH']="true"
     print("Run as main")
     #test()
     delayed_start = 0*3600
@@ -922,17 +1166,17 @@ if __name__ == "__main__":
     from shutil import copyfile
     print("Delayed start ",delayed_start)
     time.sleep(delayed_start)
-    dset='mnist' 
-    #dset='cifar10'  # cifar is better with batch 256
-    #dset='fashion'
+    #dset='mnist' 
+    #dset='cifar10'  # ~64,5 cifar is better with batch 256, init_sigma =0.01 
+    dset='mnist'
     #dset = 'mnist-clut'
-    #dset='lfw_faces'
+    #dset = 'fashion'
+    #dset='lfw_faces' # ~78,use batch_size = 32, augment=True, init_sigm=0.025, init_mu=spread
     sigma_reg_set = None
-    nhidden = (784,784)
+    nhidden = (800,800)
     #nhidden = (256,)
     #sigma_reg_set = [1e-10, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
-    
-    
+
     
     mod={'dset':dset, 'neuron':'focused', 'nhidden':nhidden, 'cnn_model':False,
          'nfilters':(32,32), 'kn_size':(5,5),
@@ -943,7 +1187,10 @@ if __name__ == "__main__":
          'lr_all':0.1}
     
     # lr_all 0.1 for MNIST
-    # lr_all:0.01 for CIFAR-FACES-CLUT
+    # lr_all:0.01 for CIFAR-FACES-CLUT 
+    # FACES OVERWRITES THIS IN THE CODE. lr_all =0.001
+    # ALSO I USE GRAD CLIP 0.01. IT IS OK IF YOU DO GRAD_CLIP 1.0
+    
 
     
     f = test_comp
@@ -959,9 +1206,11 @@ if __name__ == "__main__":
         
     else:
         plt.plot(np.reshape(res[0],(-1,mod['repeats'])),'o')
+    # SOME RESULTS 
     # focused MNIST Augmented accuracy (200epochs): ~99.25-99.30
     # focused MNIST No Augment accuracy(200 epochs): ~99.25
     # Max sscores [0.9926999999046325, 0.9925999997138977, 0.9921999997138977, 0.9922999998092651, 0.9923999998092652]
+    # if you put 0.5 decay to all Max sscores [0.9928999998092651, 0.9923999997138977, 0.9920999997138977, 0.9923999998092652, 0.9923999996185303] 
     # res = repeated_trials(dset='cifar10',N=1,epochs=200, augment=False, mod=mod, test_function=f)
     # focused CIFAR-10 Augmented accuracy(200epochs): ~0.675
     # focused CIFAR-10 NONAugmented 63.5
