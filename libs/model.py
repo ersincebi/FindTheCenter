@@ -8,7 +8,8 @@ from libs.focusing.Kfocusingtf2 import FocusedLayer1D
 
 REPLAY_MEMORY = deque(maxlen=2000)
 
-loss_fn = keras.losses.mean_squared_error
+loss_fn = keras.losses.MeanSquaredError()
+accuracy = keras.metrics.MeanSquaredError()
 
 def build_model(N=32
 				,mode='dense'
@@ -57,6 +58,7 @@ def sample_experiences():
 	return states, actions, rewards, next_states, dones
 
 def training_step(model, optimizer):
+	accuracy.reset_states()
 	states, actions, rewards, next_states, dones = sample_experiences()
 	next_Q_values = model.predict(next_states)
 	max_next_Q_values = np.max(next_Q_values, axis=1)
@@ -70,6 +72,8 @@ def training_step(model, optimizer):
 		loss = tf.reduce_mean(loss_fn(target_Q_values, Q_values))
 	grads = tape.gradient(loss, model.trainable_variables)
 	optimizer.apply_gradients(zip(grads, model.trainable_variables))
+	accuracy.update_state(target_Q_values, Q_values)
+	return float(loss), accuracy.result().numpy()
 
 def play_one_step(env, state, epsilon, model):
 	action = epsilon_greedy_policy(model, state, epsilon)

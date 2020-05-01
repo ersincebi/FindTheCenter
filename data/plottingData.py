@@ -35,7 +35,9 @@ def statistic(scores, choices):
 	for i in choice:
 		print(f"choice {i}:{mean(choices,i)}")
 
-def lossAccComparison(dense, focused, name):
+def lossAccComparison(dense=None
+					,focused=None
+					,name=None):
 	plt.figure(figsize=(16,8))
 	plt.title(name+'_loss_grahp')
 	plt.plot(dense['loss'])
