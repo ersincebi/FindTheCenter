@@ -1,0 +1,29 @@
+overwiev
+agent ve envionment ilişkisini anlat
+figür kullan
+policy yi anlat
+
+system decomposition
+environment ı anlat
+dqn için
+neural model anlat
+	fixed q value target
+	double DQN
+	ben simple ını model için yazacağım
+	
+	focused neuron model koyarak onun ne olduğunu anlat
+	planed comparison test
+	
+dense vs focused in DQN for reinforcement learning : proje isim
+
+oyunları anlat
+
+nchain 1. layer dense 2. layer focused
+cartpole 
+
+networke daha küçük sayılar kullan 30 10 gibi
+
+score requerenment ı kaldır
+
+öğrenme unutma cycle ını araştır
+short time memory
