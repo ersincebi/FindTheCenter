@@ -1,8 +1,19 @@
 import numpy as np
+from time import time
 from . import dummy_environment as env
 from libs.model import build_model, play_one_step, training_step
-from libs.game_rules import HM_EPISODES, MAX_MOVE, ACTION_SPACE, EPSILON
+from libs.game_rules import HM_EPISODES, MAX_MOVE, ACTION_SPACE, EPSILON, BATCH_SIZE
 from data.plottingData import statistic, plotTheValues, lossAccComparison
+from tensorflow import keras
+
+NAME = "findTheCenterDQN-{}".format(int(time()))
+
+logDir="logs\\{}".format(NAME)
+
+tbCallBack = keras.callbacks.TensorBoard(log_dir=logDir
+										,histogram_freq=0
+										,write_graph=True
+										,write_images=True)
 
 env = env.dummy_environment()
 
@@ -39,19 +50,19 @@ def train_env(mode):
 		print(f"\rEpisode: {episode+1}, Steps: {step+1}, eps: {episilon}", end="")
 
 	model.set_weights(best_weights)
-	
+
 	return scores, choices, metrics
 
-
 def main():
+	modes=['dense', 'focused']
 	# Dense Section
-	scores, choices, dense = train_env(mode='dense')
+	scores, choices, dense = train_env(mode=modes[0])
 	statistic(scores=scores, choices=choices)
-	plotTheValues(scores=scores, name='findTheCenterDQN-dense-4')
+	plotTheValues(scores=scores, name='{}-{}'.format(NAME,modes[0]))
 	
 	# Focused Section
-	scores, choices, focused = train_env(mode='focused')
+	scores, choices, focused = train_env(mode=modes[0])
 	statistic(scores=scores, choices=choices)
-	plotTheValues(scores=scores, name='findTheCenterDQN-focused-4')
+	plotTheValues(scores=scores, name='{}-{}'.format(NAME,modes[0]))
 
-	lossAccComparison(focused=focused, dense=dense, name='findTheCenterDQN-4')
+	lossAccComparison(focused=focused, dense=dense, name=NAME)
