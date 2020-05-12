@@ -40,22 +40,11 @@ def lossAccComparison(dense=None
 					,name=None):
 	plt.figure(figsize=(16,8))
 	plt.title(name+'_loss_grahp')
-	plt.plot(dense['loss'])
-	plt.plot(focused['loss'])
+	plt.plot(dense)
+	plt.plot(focused)
 	plt.ylabel('loss')
 	plt.xlabel('epoch')
 	plt.legend(['dense','focused'])
 	plt.savefig('./data/graphs/'+name+'_loss_grahp.png', bbox_inches="tight")
-	
-	plt.show()
-
-	plt.figure(figsize=(16,8))
-	plt.title(name+'_accuracy_grahp')
-	plt.plot(dense['acc'])
-	plt.plot(focused['acc'])
-	plt.ylabel('loss')
-	plt.xlabel('epoch')
-	plt.legend(['dense','focused'])
-	plt.savefig('./data/graphs/'+name+'_accuracy_grahp.png', bbox_inches="tight")
 	
 	plt.show()

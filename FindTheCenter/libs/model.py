@@ -2,14 +2,15 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from collections import deque
-from libs.game_rules import ACTION_SPACE, OBSERVATION_SPACE, LEARNING_RATE, BATCH_SIZE, DISCOUNT
+from libs.game_rules import ACTION_SPACE, OBSERVATION_SPACE, LEARNING_RATE, BATCH_SIZE, DISCOUNT, SIG, MU, CLIP_DICT
 from libs.focusing.Kfocusingtf2 import FocusedLayer1D
 
 
 REPLAY_MEMORY = deque(maxlen=2000)
+tf.random.set_seed(42)
+np.random.seed(42)
 
-loss_fn = keras.losses.MeanSquaredError()
-accuracy = keras.metrics.MeanSquaredError()
+loss_fn = keras.losses.mean_squared_error
 
 def build_model(N=32
 				,mode='dense'
@@ -57,7 +58,7 @@ def sample_experiences():
 		for field_index in range(5)]
 	return states, actions, rewards, next_states, dones
 
-def training_step(model, optimizer):
+def training_step(model, optimizer, mode):
 	accuracy.reset_states()
 	states, actions, rewards, next_states, dones = sample_experiences()
 	next_Q_values = model.predict(next_states)
@@ -72,8 +73,23 @@ def training_step(model, optimizer):
 		loss = tf.reduce_mean(loss_fn(target_Q_values, Q_values))
 	grads = tape.gradient(loss, model.trainable_variables)
 	optimizer.apply_gradients(zip(grads, model.trainable_variables))
-	accuracy.update_state(target_Q_values, Q_values)
-	return float(loss), accuracy.result().numpy()
+	# clipcallBack(model, )
+	if mode=='focused':
+		clipcallBack(model, SIG, CLIP_DICT[SIG])
+		clipcallBack(model, MU, CLIP_DICT[MU])
+	
+	return float(loss)
+
+def clipcallBack(model, varname, clips):
+	all_weights = model.trainable_weights
+		
+	for i,p in enumerate(all_weights):
+		# print(p.name)
+		if (p.name.find(varname)>=0):
+			pval = p.numpy()
+			clipped = np.clip(pval,clips[0],clips[1])
+			p.assign(clipped)
+			# print("Clipped", p.name)
 
 def play_one_step(env, state, epsilon, model):
 	action = epsilon_greedy_policy(model, state, epsilon)

@@ -26,4 +26,8 @@ RED_ARC_DIAMETER = 20
 BLACK_ARC_DIAMETER = 65
 
 MAX_POS = SIZE - RED_ARC_DIAMETER
+
+SIG = 'Sigma'
+MU = 'Mu'
+CLIP_DICT = {SIG:(0.05,1.0),MU:(0.0,1.0)}
 ########################################################

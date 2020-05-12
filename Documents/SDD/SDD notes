@@ -26,4 +26,24 @@ networke daha küçük sayılar kullan 30 10 gibi
 score requerenment ı kaldır
 
 öğrenme unutma cycle ını araştır
-short time memory
+
+
+dokümana bir intro yap
+this documanet describes...
+
+focused anlatımlarını 2.2 den kaldır
+
+3
+
+network herbiri için farklı input ve outputlarıyla anlat
+
+3.1
+selection ekle
+
+3.2
+loss vs karşılaştırması
+
+
+callback gradiand
+
+shorttime memory => son 10 veya daha gerisini işlemeye çalış

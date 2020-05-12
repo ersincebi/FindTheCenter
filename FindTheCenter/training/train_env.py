@@ -21,7 +21,7 @@ def train_env(mode):
 	model, optimizer = build_model(mode=mode)
 	scores = []
 	choices = []
-	metrics = {'loss':[], 'acc':[]}
+	metrics = []
 	best_score = 0
 	for episode in range(HM_EPISODES):
 		score = 0
@@ -42,14 +42,12 @@ def train_env(mode):
 		if step > best_score:
 			best_weights = model.get_weights()
 			best_score = step
+			model.set_weights(best_weights)
 		if episode > 50:
-			lossValue, accurancyValue = training_step(model, optimizer)
-			metrics['loss'].append(lossValue)
-			metrics['acc'].append(accurancyValue)
+			lossValue = training_step(model, optimizer, mode)
+			metrics.append(lossValue)
 
 		print(f"\rEpisode: {episode+1}, Steps: {step+1}, eps: {episilon}", end="")
-
-	model.set_weights(best_weights)
 
 	return scores, choices, metrics
 
@@ -61,8 +59,8 @@ def main():
 	plotTheValues(scores=scores, name='{}-{}'.format(NAME,modes[0]))
 	
 	# Focused Section
-	scores, choices, focused = train_env(mode=modes[0])
+	scores, choices, focused = train_env(mode=modes[1])
 	statistic(scores=scores, choices=choices)
-	plotTheValues(scores=scores, name='{}-{}'.format(NAME,modes[0]))
+	plotTheValues(scores=scores, name='{}-{}'.format(NAME,modes[1]))
 
 	lossAccComparison(focused=focused, dense=dense, name=NAME)
