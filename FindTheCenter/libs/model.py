@@ -38,7 +38,7 @@ def build_model(N=32
 		layer = keras.layers.Dense(32, activation="elu")
 
 	elif mode=='focused':
-		layer = FocusedLayer1D(N, name='focus-1', activation='elu', init_sigma=0.25)
+		layer = FocusedLayer1D(N, name='focus-1', activation='elu', init_sigma=0.2)
 
 	model = keras.models.Sequential([
 		keras.layers.Dense(32, activation="elu", input_shape=OBSERVATION_SPACE),
@@ -59,7 +59,6 @@ def sample_experiences():
 	return states, actions, rewards, next_states, dones
 
 def training_step(model, optimizer, mode):
-	accuracy.reset_states()
 	states, actions, rewards, next_states, dones = sample_experiences()
 	next_Q_values = model.predict(next_states)
 	max_next_Q_values = np.max(next_Q_values, axis=1)
