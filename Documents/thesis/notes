@@ -9,7 +9,7 @@ focused için
   sigma 0.25 0.1 0.05... distrubution grafiklerini(histogram) çiz
   en iyi sigmayı bul ve dense ile karşılaştır
     dense ile olan sonuçların mean lerini karşılaştır
-      ikisinini histogramlarını üst üste çiz  
+      ikisinini histogramlarını üst üste çiz
 
 
 forma görselleştirme ekle
