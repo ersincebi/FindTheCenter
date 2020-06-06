@@ -18,13 +18,14 @@ def plot(data):
 	plt.legend(['dense','focused'])
 	plt.show()
 
-for folder in returnList(basePath)[[1]]:
+for folder in returnList(basePath):
 	dir = joinPath([basePath, folder])
 	data=[]
-	print(dir)
-	for file in returnList(dir)[[2,5]]:
-		f = dir+file
-		data.append(np.load(f, allow_pickle=True))
-	print(data)
-	break
-	plot(np.array(data)[:,-100:])
+	for file in returnList(dir):
+		if 'scores' in file:
+			f = dir+file
+			loadedData = np.load(f, allow_pickle=True)
+			print(loadedData)
+			x=input()
+			# data.append(loadedData)
+	# plot(np.array(data)[:,-100:])
