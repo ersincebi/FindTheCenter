@@ -1,0 +1,13 @@
+Area Under dense Curve -117293.5
+Area Under focused-005 Curve -113961.0
+Area Under focused-01 Curve -107789.0
+Area Under focused-02 Curve -102255.0
+Area Under focused-025 Curve -113158.0
+
+loss areas of focused-02
+Area of dense 614.7205757629126
+Area of focused 815.2219126047567
+
+ttest:
+statistic: -13.277667545492406
+pvalue: 1.2347315664584795e-37
