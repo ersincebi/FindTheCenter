@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 basePath = "./results"
 
 def joinPath(arr):
-	return '/'.join(arr) + '/'
+	return '/'.join(arr)
 
 def returnList(dir):
 	return np.array(os.listdir(dir))
@@ -18,18 +18,18 @@ def plot(data):
 	plt.legend(['dense','focused'])
 	plt.show()
 
+
 for folder in returnList(basePath)[[1]]:
 	dir = joinPath([basePath, folder])
-	data=[]
-	print(dir)
-	for file in returnList(dir)[[2,5]]:
-		f = dir+file
-		data.append(np.load(f, allow_pickle=True))
-	print(data)
-	break
-	plot(np.array(data)[:,-100:])
+	data={}
+	f = ''
+	for file in returnList(dir):
+		selectFolder = joinPath([dir,file])
+		selectFile = returnList(selectFolder)[[3]]
+		f = joinPath([selectFolder,selectFile[0]])
+		data[file] = np.load(f)
 
-
+print(np.array(data))
 
 
 # normal distro
@@ -45,4 +45,4 @@ for folder in returnList(basePath)[[1]]:
 
 # pl.hist(h,normed=True)      #use this to draw histogram of your data
 
-# pl.show()                   #use may also need add this 
+# pl.show()                   #use may also need add this
