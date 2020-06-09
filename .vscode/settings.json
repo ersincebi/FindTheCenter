@@ -1,4 +1,4 @@
 {
-	"python.pythonPath": "C:\\Users\\kakun\\.conda\\envs\\tf2\\python.exe",
+	"python.pythonPath": "/home/ersincebi/.conda/envs/tf2/bin/python",
 	"python.dataScience.jupyterServerURI": "local"
 }
