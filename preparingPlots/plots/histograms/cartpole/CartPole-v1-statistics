@@ -1,0 +1,13 @@
+CartPole-v1 -> dense -> Curve Area: 22990.0, Mean: 38.49, std: 44.217529329441284
+CartPole-v1 -> focused-005 -> Curve Area: 57696.0, Mean: 96.33333333333333, std: 80.59871104566265
+CartPole-v1 -> focused-01 -> Curve Area: 18919.0, Mean: 31.705, std: 34.31711878445898
+CartPole-v1 -> focused-02 -> Curve Area: 24641.0, Mean: 41.24166666666667, std: 49.68450392784007
+CartPole-v1 -> focused-025 -> Curve Area: 38196.0, Mean: 63.833333333333336, std: 66.86677467588486
+
+selected sigma:  focused-005
+
+Area Under dense Curve 1797.2436261624098
+Area Under focused Curve 921.1240532961674
+
+statistic:  -15.399402902553792
+pvalue:  5.8536936390293696e-49

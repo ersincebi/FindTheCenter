@@ -1,20 +1,3 @@
-# grafiklerin okunurlupunu artırmak için bunu kullan
-import matplotlib.pyplot as plt
-import os import matplotlib as mpl
-def paper_fig_settings(addtosize=0):
-     #mpl.style.use('seaborn-white')
-     mpl.rc('figure',dpi=144)
-     mpl.rc('text', usetex=False)
-     mpl.rc('axes',titlesize=16+addtosize)
-     mpl.rc('xtick', labelsize=12+addtosize)
-     mpl.rc('ytick', labelsize=12+addtosize)
-     mpl.rc('axes', labelsize=14+addtosize)
-     mpl.rc('legend', fontsize=10+addtosize)
-     mpl.rc('image',interpolation=None)
-     #plt.rc('text.latex', preamble=r'\usep
-
-seaborn kullan
-
 area under yanına mean ve std ekle
 
 loss grafillerinde median filter sok
@@ -30,9 +13,3 @@ histogramda alpha yada stack kullan
 
 numpy.hist ile dene
 bins=linspace(0,200,100)
-
-tezde 'here' diye yazdıpın yerlerde figürleri veya tabloları referans göster
-	test figürlerinin açıklamarını uzat
-	
-loss grafiği için
-	oscule ettiği yerlerde: reinforcemen learningin target value yok seçtiği random sample lardan random q value oluşturup next q value sunu karşılaştırdığından loss değerleri oscule edebiliyor. bu demek değilki aldığımız loss değeri valid değil.

@@ -1,0 +1,10 @@
+Acrobot-v1 -> dense -> Curve Area: -117293.5, Mean: -195.72333333333333, std: 15.218194884924937
+Acrobot-v1 -> focused-005 -> Curve Area: -113961.0, Mean: -190.17166666666665, std: 23.654292011293755
+Acrobot-v1 -> focused-01 -> Curve Area: -107789.0, Mean: -179.86666666666667, std: 37.1031744673627
+Acrobot-v1 -> focused-02 -> Curve Area: -102255.0, Mean: -170.64333333333335, std: 43.6528669034336
+Acrobot-v1 -> focused-025 -> Curve Area: -113158.0, Mean: -188.825, std: 27.63888037409137
+selected sigma:  focused-02
+Area Under dense Curve 614.7205757629126
+Area Under focused Curve 815.2219126047567
+statistic:  -13.277667545492406
+pvalue:  1.2347315664584795e-37

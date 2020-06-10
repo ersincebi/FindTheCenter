@@ -1,0 +1,10 @@
+MountainCarContinuous-v0 -> dense -> Curve Area: -8847.269245070718, Mean: -14.765317054681054, std: 2.989765393000716
+MountainCarContinuous-v0 -> focused-005 -> Curve Area: -8969.718654453294, Mean: -14.974568127986792, std: 2.37236547570503
+MountainCarContinuous-v0 -> focused-01 -> Curve Area: -7147.111283395016, Mean: -11.93030481433376, std: 5.4569926646671885
+MountainCarContinuous-v0 -> focused-02 -> Curve Area: -8194.177929543108, Mean: -13.678074327305483, std: 3.4756615613607758
+MountainCarContinuous-v0 -> focused-025 -> Curve Area: -9165.748260067994, Mean: -15.294765619073356, std: 2.7942179045627786
+selected sigma:  focused-01
+Area Under dense Curve 3.319066199765075
+Area Under focused Curve 2.2991737664927996
+statistic:  -11.151027489360999
+pvalue:  1.5226142272798123e-27

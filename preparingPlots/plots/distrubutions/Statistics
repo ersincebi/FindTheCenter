@@ -1,0 +1,39 @@
+Acrobot-v1 focusedTest,denseTest:
+statistic:  nan
+pvalue:  nan
+
+Acrobot-v1 denseTrain,denseTest:
+statistic:  2.806215063585887
+pvalue:  0.005152416775363924
+
+Acrobot-v1 focusedTrain,focusedTest:
+statistic:  6.715411988317747
+pvalue:  3.8894910184925743e-11
+
+CartPole-v1 denseTest,focusedTest:
+statistic:  -1.7885389189084273
+pvalue:  0.07521799109053397
+
+CartPole-v1 denseTrain,denseTest:
+statistic:  3.400494899246423
+pvalue:  0.0007109394515934975
+
+CartPole-v1 focusedTrain,focusedTest:
+statistic:  8.561825208919693
+pvalue:  7.060419532841846e-17
+
+MountainCarContinuous-v0 focusedTest,denseTest:
+statistic:  10.589982583360232
+pvalue:  4.728857463367546e-21
+
+MountainCarContinuous-v0 denseTest,focusedTest:
+statistic:  -10.589982583360232
+pvalue:  4.728857463367546e-21
+
+MountainCarContinuous-v0 denseTrain,denseTest:
+statistic:  3.862661004629752
+pvalue:  0.0001225932988146331
+
+MountainCarContinuous-v0 focusedTrain,focusedTest:
+statistic:  5.921553839112961
+pvalue:  5.003473717612807e-09
