@@ -1,0 +1,75 @@
+- Merhaba ben Ersin ÇEBİ
+- Hi I'am Ersin ÇEBİ
+
+sayfageç
+
+- Bu tezde günümüzün popüler konusu olan machine learning in bir konusu olan reinforcement learning örneği göstereceğim
+- In this thesis I will show an example of reinforcement learning, It is a very popular topic these days
+
+- tezde kullandığım modelde focused neuron unu implement ederek, modeli eğitip sonuçları karşılaştırdım
+- We did implement and use the focused neuron in the model I use in the thesis and compare the results
+
+sayfageç
+
+- Kısaca Reinforcemen learning bir unsupervised learning tekniğidir, bu teknikte agent, bulunduğu ortamla etkileşimde bulunarak ne yapması gerektiğini kendi öğrenir
+- In short Reinforcement learning is a unsupervised learning technique, in this technique, the agent learns with the interaction that it made with the environments where it in to
+
+- agent sanki hiçbir şey bilmeyen oluşturulmuş ortamla etkileşimi olan tek varlık iken, ortam ise o agent a verilmiş belirli kuralları olan (ki birazdan buna policy olrak değineceğiz) sanal bir oda gibi düşünebiliriz
+- agent is like a new born child, an entity knows nothing about the created environment, the environment is like room that contains some specific rules (which we're gona call this soon a policy) for agent to learn
+
+- biz agent ı eğitirken ondan gelen belirli gözlemleri kullanıyoruz, bunlar o agent ın bulunduğu pozisyon, gidiş hızı gibi donelerden meydana geliyor
+- we use some observations to train agent, these observations created by using the datas postion, velocity of agent and etc.
+
+sayfageç
+
+- reinforcement learning e başlarken, en popüler yaklaşım q-table dır, bu q table yaklaşımında agent ın alabileceği tüm gözlemleri, çok boyulu bir dizi içerisine alıyor ve o gözlemlere rasgele tepkiler atıyoruz, sağa git sola git gibi
+- when we start to reinforcement learning, there is a popular aproach that called q table, in this aproach we set a multydimensional array that contains every possible observation that we can take and actions according to it, like go right and left
+
+- bu gözlemler bizim o agent ın gözlemine göre dayanak noktamız oluyor ve her iterasyon sonunda bu gözlem noktalarını yeni prediction değiştiriyoruz
+- this observations are our baselines according to our agents positions, and at the end of every action we update that observations actions with new prediction
+
+- İşte DQN de aynı bu yöntemi neural network mantığıyla uyguluyor. Aldığı gözlemleri işleyip bize çıktı olarak sunuyor.
+- And the DQN does the same thing with neural network logic. The network takes the observations and gives us actions that need to be taken.
+
+sayfageç
+
+- ortam içerisinde bazı kurallar var demiştik bunlara literatürde policy adı veriliyor. Agent bu policy ye göre o ortam içerisinde hareket etmeyi öğreniyor. Yani temelde policy ortam içerisinde agent ın alacağı cezayaı ve ödülü belirliyor.
+- we said there is some rules in the envronment, these are called policy in the literature. The agent takes actions and learns the environment according to these policies, so in basic the policy defines how it is gona take penalty or reward.
+
+- Daha önce her iterasyon sonunda o gözlem noktasını yenisiyle güncellediğimizden bahsettik. DQN de ve q table da, agent tekrar aynı noktaya geldiğinde göstereceği tepkiyi belirlemek için bir değer hesaplıyoruz ve model ona göre bir karar oluşturuyor buna fixed q value deniyor.
+- before we said at the end of every episode we update the observations points with new prediction. In DQN and q table aproaches, the model decides the next action with a value we calculated, that when the agent comes to the same observation point, that is called fixed q value.
+
+sayfageç
+
+- projede focused ve dense layerlerının reinforcement learning te nasıl performans gösterdiklerini karşılaştırcağız.
+- in this project we will discuss the comparisons of focused and dense layers performances that their show
+
+- bu proje içerisinde eğitim ve test lerde üç farklı ortam kullandım bu ortamları bu alanda populer olarak kullanılan OpenAI Gym kütüphanesinden faydalanarak elde ettim
+- In the project I use three different environments from OpenAI Gym library that popularly used in reinforcement learning
+
+env ler için:
+	her bir env ın ne olduğunu ve observation arını anlat
+
+train part için:
+	aldığın sigman değerlerini ve onları neden aldığını anlat
+		tablodaki mean ve area under curve değerlerinden örnek ver
+	
+	loss grafiklerini açıkla
+		- her iterastonda yeni q değerini hesaplarken önceki deneyimlerden random sample kullanarak target q value oluşturuldupu için çok dalgalı bir grafik çıkıyor
+		- in every iteration we calculate target q value with the random selected samples from the previous observations, that is why it is oscilating graphic
+	
+	test grafiğinde:
+		t-testleri ve meanleri söyle geç
+		
+conclusion:
+- bu tezde dense ve focused layer karşılaştırmasını yaptık, focused layerda en önemli nokta U(nü) değerini ayarlamaktı, doğru değeri bulduğumuzdan emin olmak için belirli testler uyguladık.
+- for summary, In this thesis we make the comparison of dense and focused layers, the most importants thing was the tuning and finding the right values for u(nü) variable, we run some test for being sure that it is the right value for u(nü).
+
+- bu tezin gelecek çalışmaları için gözlemleri image processing yaparak almak ilginç olabilir. gym kütüphanesi render ederken "rgb_array" özelliğiyle buna yönelik bir kolaylık sağlıyor.
+- i think, for future work, for the observations of the agent, image processing can be made, gym librari is gives a very easy feature called "rgb_array"
+
+sayfageç
+
+teşekkür et
+
+demoya geç
